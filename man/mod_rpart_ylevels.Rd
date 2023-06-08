@@ -16,6 +16,6 @@ modified rpart_object
 }
 \description{
 Supplies new levels to the rpart object based on the predictions from the rf_tree
-notably adds a blank string "" to the list to supply to nonterminal nodes as a 
+notably adds a blank string "" to the list to supply to nonterminal nodes as a
 placeholder
 }

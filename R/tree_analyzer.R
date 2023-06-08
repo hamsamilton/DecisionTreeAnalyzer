@@ -1,3 +1,13 @@
+# to install setwd("/Users/samhamilton/Library/Mobile Documents/com~apple~CloudDocs/Thesis_Aim1/scripts/TreeAnalyzer")
+# devtools::document() ; devtools::build() ; devtools::install()
+#' @import randomForest
+#' @import dplyr
+#' @import rpart
+#' @import dplyr
+#' @import stats
+#' @import rpart.plot
+#' @export
+dplyr::`%>%`
 
 #' adapt_rf2rpart
 #'
@@ -364,7 +374,7 @@ fill_tree_data <- function(rpart_obj,rf_tree, X, y){
   return(rpart_obj) }
 
 
-#'test_tree
+#'tree_performance
 #'
 #'This function takes a decision tree which is described in a dataframe as
 #'randomForest package outputs, takes a dataframe of a new test set and
@@ -383,7 +393,7 @@ fill_tree_data <- function(rpart_obj,rf_tree, X, y){
 #'  }
 #'
 #'
-test_tree = function(tree,test_df,test_col){
+tree_performance = function(tree,test_df,test_col){
 
   # Replace logical values with their level strings in the test data
   test_df[,test_col] = as.character(test_df[,test_col])
@@ -438,7 +448,7 @@ test_tree = function(tree,test_df,test_col){
   unique_values <- unique(tree[["prediction"]]) %>%
     .[!is.na(.)]
   conf_mat_stuff = apply(tree,MARGIN = 1,FUN = function(x){
-    print(x)
+
     node_class = x[["prediction"]]
     node_size  = x[["bin"]]
     predictions = rep(node_class,node_size)
@@ -453,7 +463,121 @@ test_tree = function(tree,test_df,test_col){
     return(conf_mat)})
 
   conf_mat_stuff = do.call("rbind",conf_mat_stuff)
-  acc =sum(conf_mat_stuff$predicts == conf_mat_stuff$true_val) / nrow(conf_mat_stuff)
-  sens = sum(conf_mat_stuff$predicts == conf_mat_stuff$true_val) / sum
-  return(list(tree_info = tree,conf_mat = conf_mat_stuff, accuracy = acc))
+  conf_mat_stuff = apply(conf_mat_stuff,MARGIN=2,FUN = function(x){
+    as.numeric(as.factor(x)) -1 })
+
+  perf_metrics = eval_metrics(conf_mat_stuff[,1],conf_mat_stuff[,2])
+
+  return(c(list(tree_info = tree,conf_mat = conf_mat_stuff),perf_metrics))
+}
+
+
+#' Evaluate performance metrics for classification
+#'
+#' This function calculates various performance metrics for binary classification, including
+#' sensitivity, specificity, precision, negative predictive value (npv), false positive rate (fpr),
+#' false discovery rate (fdr), false negative rate (fnr), F1 score, and accuracy.
+#'
+#' @param predictions A numeric or logical vector of predicted classes.
+#' @param actuals A numeric or logical vector of actual classes.
+#'
+#' @return A list containing the following elements:
+#'   * sensitivity: The proportion of actual positive cases that were correctly identified.
+#'   * specificity: The proportion of actual negative cases that were correctly identified.
+#'   * precision: The proportion of predicted positive cases that were correctly identified.
+#'   * npv: The proportion of predicted negative cases that were correctly identified.
+#'   * fpr: The proportion of actual negative cases that were incorrectly identified as positive.
+#'   * fdr: The proportion of predicted positive cases that were incorrect.
+#'   * fnr: The proportion of actual positive cases that were incorrectly identified as negative.
+#'   * f1: The harmonic mean of precision and sensitivity.
+#'   * accuracy: The proportion of total cases that were correctly identified.
+#'
+#' @examples
+#' \dontrun{
+#' results = eval_metrics(predicted_classes, actual_classes)
+#' print(results)
+#' }
+#' @export
+eval_metrics <- function(predictions, actuals) {
+
+  # Assuming '1' is the positive class
+  actual_positives = actuals == 1
+  predicted_positives = predictions == 1
+
+  actual_negatives = actuals == 0
+  predicted_negatives = predictions == 0
+
+  true_positives = sum(actual_positives & predicted_positives)
+  true_negatives = sum(actual_negatives & predicted_negatives)
+
+  false_positives = sum(actual_negatives & predicted_positives)
+  false_negatives = sum(actual_positives & predicted_negatives)
+
+  all_actual_positives = sum(actual_positives)
+  all_actual_negatives = sum(actual_negatives)
+
+  # Sensitivity, also known as True Positive Rate or Recall
+  sens = true_positives / all_actual_positives
+
+  # Specificity, also known as True Negative Rate
+  spec = true_negatives / all_actual_negatives
+
+  # Precision, also known as Positive Predictive Value
+  prec = true_positives / (true_positives + false_positives)
+
+  # Negative Predictive Value
+  npv = true_negatives / (true_negatives + false_negatives)
+
+  # Fall out or False Positive Rate
+  fpr = false_positives / all_actual_negatives
+
+  # False Discovery Rate
+  fdr = false_positives / (true_positives + false_positives)
+
+  # False Negative Rate
+  fnr = false_negatives / all_actual_positives
+
+  # F1 Score
+  f1 = 2 * ((prec * sens) / (prec + sens))
+
+  # Accuracy
+  acc = (true_positives + true_negatives) / length(actuals)
+
+  # Return all metrics in a list
+  return(list(sensitivity = sens, specificity = spec, precision = prec,
+              npv = npv, fpr = fpr, fdr = fdr, fnr = fnr, f1 = f1, accuracy = acc))
+}
+
+#' add_zero_columns
+#' Add Columns with 0s for Each Unique Value in a Specified Column
+#'
+#' This function adds new columns to a dataframe for each unique value in a specified column, initializing these new columns with 0s.
+#'
+#' @param df A data.frame to which the new columns will be added.
+#' @param column_name A character string representing the name of the column in 'df' containing the unique values for creating new columns.
+#'
+#' @return A data.frame with new columns initialized with 0s for each unique value in the specified column.
+#' @export
+#'
+#' @examples
+#' # Create an example dataframe
+#' data <- data.frame(
+#'   A = c("apple", "banana", "apple", "banana", "orange"),
+#'   B = c(1, 2, 3, 4, 5)
+#' )
+#'
+#' # Use the add_zero_columns function with dplyr
+#' library(dplyr)
+#' result <- data %>%
+#'   mutate(data, add_zero_columns(., "A"))
+#' print(result)
+add_zero_columns <- function(df, column_name) {
+  unique_values <- unique(df[[column_name]]) %>%
+    .[!is.na(.)]
+
+  for (value in unique_values) {
+    df[[value]] <- 0
+  }
+
+  return(df)
 }

@@ -17,7 +17,7 @@ be used to populate tree info? T/F}
 \item{y}{if add_data = T  what are the true values?}
 }
 \description{
-adapter function designed to take information from the rf_tree object to the 
-rpart style object so that the plotting capabilities of the rpart object can be 
+adapter function designed to take information from the rf_tree object to the
+rpart style object so that the plotting capabilities of the rpart object can be
 leveraged.
 }

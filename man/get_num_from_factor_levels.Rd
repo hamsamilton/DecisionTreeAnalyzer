@@ -13,6 +13,6 @@ get_num_from_factor_levels(predicts)
 a numeric vector corresponding to the prediction column from rf_tree
 }
 \description{
-Transforms preidctions in whatever form into the numeric version factor levels 
+Transforms preidctions in whatever form into the numeric version factor levels
 within the rpart_frame object
 }

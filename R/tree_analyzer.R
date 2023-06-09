@@ -371,6 +371,10 @@ fill_tree_data <- function(rpart_obj,rf_tree, X, y){
 
   # modify rpartobject
   rpart_obj$frame$yval2 = rpart_mat
+
+  # change node display values to whatever is the dominant class
+  rpart_obj$frame$yval2[,1] = apply(rpart_mat_nums,MARGIN = 1,FUN = which.max)
+
   return(rpart_obj) }
 
 

@@ -123,8 +123,6 @@ init_rpart_frame_matrix = function(rf_tree){
   return(rpart_frame_mat)
 }
 
-
-
 #'get_num_from_factor_levels
 #'
 #'Transforms preidctions in whatever form into the numeric version factor levels
@@ -203,7 +201,6 @@ mod_rpart_ylevels = function(rpart_obj,rf_tree){
   attr(rpart_obj,"ylevels") = outcome_lvls
 
   return(rpart_obj)}
-
 
 #'mod_rpart_splits
 #'
@@ -372,8 +369,9 @@ fill_tree_data <- function(rpart_obj,rf_tree, X, y){
   # modify rpartobject
   rpart_obj$frame$yval2 = rpart_mat
 
-  # change node display values to whatever is the dominant class
-  rpart_obj$frame$yval2[,1] = apply(rpart_mat_nums,MARGIN = 1,FUN = which.max)
+  # change intermediate node display values to whatever is the dominant classte
+  int_nodes =  which(rpart_obj$frame$var != "<leaf>")
+  rpart_obj$frame$yval2[int_nodes,1] = apply(rpart_mat_nums[int_nodes,],MARGIN = 1,FUN = which.max)
 
   return(rpart_obj) }
 

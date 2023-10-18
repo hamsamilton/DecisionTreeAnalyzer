@@ -6,6 +6,8 @@
 #' @import dplyr
 #' @import stats
 #' @import rpart.plot
+#' @import pheatmap
+#' @import RColorBrewer
 #' @export
 dplyr::`%>%`
 
@@ -20,7 +22,7 @@ dplyr::`%>%`
 #'                 be used to populate tree info? T/F
 #'@param X        if add_data = T, what is the predictor matrix
 #'@param y        if add_data = T  what are the true values?
-
+#'@export
 adapt_rf2rpart <- function(rf_tree,add_data,X,y){
 
   # Init the rpart object
@@ -375,21 +377,22 @@ fill_tree_data <- function(rpart_obj,rf_tree, X, y){
 
   return(rpart_obj) }
 
-
 #'tree_performance
 #'
 #'This function takes a decision tree which is described in a dataframe as
 #'randomForest package outputs, takes a dataframe of a new test set and
 #'returns predictions for each of those test sets and what node they land at
 #'
-#'@param tree A data frame describing the decision tree. This data frame should be in the same format as the output from the rpart() function.
+#'@param tree A data frame describing the decision tree.
+#' This data frame should be in the same format as the trees used within the RF pacakge
 #'@param test_df A data frame containing the test set.
 #'@param test_col The name of the column in the test set to be used as the dependent variable.
 #'@export
 #'
 #'@return A list with three elements:
 #'  \describe{
-#'    \item{tree_info}{A data frame describing the decision tree, including information on how the test data is classified.}
+#'    \item{tree_info}{A data frame describing the decision tree, including information on how the test data is classified.
+#'    In the format of trees used in teh random forest}
 #'    \item{conf_mat}{A confusion matrix for the test data.}
 #'    \item{accuracy}{The accuracy of the decision tree for the test data.}
 #'  }
@@ -404,13 +407,13 @@ tree_performance = function(tree,test_df,test_col){
   # Add columns to the tree for the number of observations of each class for each node
   tree = tree %>% add_zero_columns(column_name= "prediction")
   tree$bin = 0
+  tree$binmembers = ""
   # loop for each obs in the dataset
   for(i in 1:nrow(test_df)){
     obs = test_df[i,]
     node_ind = 1
 
     while(node_ind != "STOP"){
-
       # get the node info
       curr_node = tree[node_ind,]
 
@@ -422,11 +425,13 @@ tree_performance = function(tree,test_df,test_col){
         true_val = obs[[test_col]]
         # update the num bin variable
         tree[node_ind,"bin"]    = tree[node_ind,"bin"]    + 1
+        tree[node_ind,"binmembers"] = paste(tree[node_ind,"binmembers"],rownames(obs))
         tree[node_ind,true_val] = tree[node_ind,true_val] + 1
         node_ind = "STOP"
       } else {
         # find if the test_obs is > this value
         test_res = obs[[curr_var]] >= curr_node[["split point"]]
+        tree[node_ind,"binmembers"] = paste(tree[node_ind,"binmembers"],rownames(obs))
 
         # Find the next node
         if(test_res){
@@ -582,4 +587,56 @@ add_zero_columns <- function(df, column_name) {
   }
 
   return(df)
+
+#'mk_confusion_matrix
+#'
+#'Produces a heatmap that functions as a confusion matrix using output of
+#'tree_performance.
+#'
+#'@param confusion_data a dataframe with two columns, the first being predictions and
+#'the second being the true values. a compatible object is output by tree_performance in
+#'the $conf_mat attribute
+#'@param saveloc where should the confusion matrix be stored
+#'@export
+mk_confusion_mat <- function(tree_pref_obj, save_loc = "~/confmatsz.jpeg") {
+
+  confusion_data <- table(tree_pref_obj$conf_mat[,1],tree_pref_obj$conf_mat[,2])
+  classnames <- unique(tree_pref_obj$tree_info$prediction)[-1]
+
+  rownames(confusion_data) <-  classnames
+  colnames(confusion_data) <-  classnames
+
+ p = pheatmap::pheatmap(confusion_data,
+                     color = QckRBrwrPllt("OrRd",100)[1:50],
+                     cluster_rows = F,
+                     cluster_cols = F,
+                     legend       = F,
+                     display_numbers=T,
+                     number_format="%.0f",
+                     width  = 4,
+                     height = 4,
+              #       filename= save_loc,
+                     fontsize_number=30,
+                     fontsize = 15,
+              margin = 40)
+
+ # Now we add the x and y-axis labels using grid.text
+ pushViewport(viewport(layout = grid.layout(nrow = 1, ncol = 1)))
+ grid.text("Y-axis Label", x = unit(1, "npc") - unit(3, "cm"), y = unit(0.5, "npc"), rot = 90) # Adjust positions as needed
+ grid.text("X-axis Label", x = unit(0.5, "npc"), y = unit(1, "npc") - unit(2, "cm")) # Adjust positions as needed
+ write.csv(iris_tree,"~/iris_tree.csv")
+
+}
+
+#'QckRBrwrPllt
+#'
+#'This is a quick function that combines two RColorBrewer functions into one that
+#'makes it more intuitive to use and setup
+#'@param name the Rbrewer pallette name
+#'@param n how many colors you want
+#'@return a color vector
+#'@export
+QckRBrwrPllt <- function(name,n) {
+  plt <- colorRampPalette(RColorBrewer::brewer.pal(8,name))(n)
+  return(plt)
 }

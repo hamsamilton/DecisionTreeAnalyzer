@@ -1,4 +1,4 @@
-# to install setwd("/Users/samhamilton/Library/Mobile Documents/com~apple~CloudDocs/Thesis_Aim1/scripts/TreeAnalyzer")
+# to install setwd("/Users/samhamilton/Library/Mobile Documents/com~apple~CloudDocs/Thesis_Aim1/libraries/TreeAnalyzer")
 # devtools::document() ; devtools::build() ; devtools::install()
 #' @import randomForest
 #' @import dplyr
@@ -587,7 +587,7 @@ add_zero_columns <- function(df, column_name) {
   }
 
   return(df)
-
+}
 #'mk_confusion_matrix
 #'
 #'Produces a heatmap that functions as a confusion matrix using output of
@@ -606,7 +606,7 @@ mk_confusion_mat <- function(tree_pref_obj, save_loc = "~/confmatsz.jpeg") {
   rownames(confusion_data) <-  classnames
   colnames(confusion_data) <-  classnames
 
- p = pheatmap::pheatmap(confusion_data,
+  pheatmap::pheatmap(confusion_data,
                      color = QckRBrwrPllt("OrRd",100)[1:50],
                      cluster_rows = F,
                      cluster_cols = F,
@@ -615,19 +615,14 @@ mk_confusion_mat <- function(tree_pref_obj, save_loc = "~/confmatsz.jpeg") {
                      number_format="%.0f",
                      width  = 4,
                      height = 4,
-              #       filename= save_loc,
+                     filename= save_loc,
                      fontsize_number=30,
                      fontsize = 15,
               margin = 40)
 
- # Now we add the x and y-axis labels using grid.text
- pushViewport(viewport(layout = grid.layout(nrow = 1, ncol = 1)))
- grid.text("Y-axis Label", x = unit(1, "npc") - unit(3, "cm"), y = unit(0.5, "npc"), rot = 90) # Adjust positions as needed
- grid.text("X-axis Label", x = unit(0.5, "npc"), y = unit(1, "npc") - unit(2, "cm")) # Adjust positions as needed
- write.csv(iris_tree,"~/iris_tree.csv")
+
 
 }
-
 #'QckRBrwrPllt
 #'
 #'This is a quick function that combines two RColorBrewer functions into one that

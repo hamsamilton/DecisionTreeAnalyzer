@@ -7,7 +7,8 @@
 tree_performance(tree, test_df, test_col)
 }
 \arguments{
-\item{tree}{A data frame describing the decision tree. This data frame should be in the same format as the output from the rpart() function.}
+\item{tree}{A data frame describing the decision tree.
+This data frame should be in the same format as the trees used within the RF pacakge}
 
 \item{test_df}{A data frame containing the test set.}
 
@@ -16,7 +17,8 @@ tree_performance(tree, test_df, test_col)
 \value{
 A list with three elements:
  \describe{
-   \item{tree_info}{A data frame describing the decision tree, including information on how the test data is classified.}
+   \item{tree_info}{A data frame describing the decision tree, including information on how the test data is classified.
+   In the format of trees used in teh random forest}
    \item{conf_mat}{A confusion matrix for the test data.}
    \item{accuracy}{The accuracy of the decision tree for the test data.}
  }

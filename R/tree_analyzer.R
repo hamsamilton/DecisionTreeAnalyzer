@@ -310,6 +310,21 @@ make_rpart_tests <- function(){
 #' the supplied information
 #' @export
 fill_tree_data <- function(rpart_obj,rf_tree, X, y){
+  
+  # Enforces rules for using fill_tree_data and returns meaningful messages when they aren't met
+  police_fill_tree_data = function(rpart_obj,rf_tree,X,y){
+    
+    need_more_than_one_class <- function(y){
+      if(length(unique(y)) > 1){
+        return(invisible(NULL))
+      }
+      else{ 
+        print("fill_tree_data() requires that y have more than one class")
+      }
+    }
+    
+    need_more_than_one_class(y)
+  }
 
   # create a matrix for rf_tree that correspond to what needs to be filled in for the
   #matrix part of the rp
@@ -371,7 +386,7 @@ fill_tree_data <- function(rpart_obj,rf_tree, X, y){
   # modify rpartobject
   rpart_obj$frame$yval2 = rpart_mat
 
-  # change intermediate node display values to whatever is the dominant classte
+  # change intermediate node display values to whatever is the dominant class
   int_nodes =  which(rpart_obj$frame$var != "<leaf>")
   rpart_obj$frame$yval2[int_nodes,1] = apply(rpart_mat_nums[int_nodes,],MARGIN = 1,FUN = which.max)
 

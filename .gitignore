@@ -1,1 +1,8 @@
 testscripts/
+
+*.pdf
+*.html
+*.jpeg
+*.png
+
+

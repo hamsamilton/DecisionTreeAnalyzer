@@ -1,0 +1,58 @@
+---
+title: "Tree_Visualizer_vignette"
+output: html_document
+date: "2023-06-07"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(randomForest)
+library(rpart)
+library(rpart.plot)
+library(TreeAnalyzer)
+```
+
+# Tree Visualizer
+
+The package Rpart has a very high quality visualization suite, but it is only compatible with Rpart objects, which have a very complex structure. This limits interoperability with decision trees produced by other software or by hand.
+
+By contrast, the structure used by the randomForest package is user-friendly and
+clear. Therefore, this package provides an adapter between the randomForest tree
+object and the rpart object.
+
+Let's demonstrate this with the iris dataset
+```{r cars}
+data(iris)
+iris_rpart = rpart(Species ~ .,data = iris)
+iris_rf = randomForest(Species ~ .,data = iris)
+iris_tree = iris_rf %>% getTree(k = 5,labelVar=T)  %>% as.data.frame()
+
+iris_adapted = adapt_rf2rpart(iris_tree,add_data=F)
+rpart.plot(iris_rpart,extra = 1,type = 2)
+rpart.plot(iris_adapted,extra = 1,type = 2)
+```
+By default, the trees returned by adapt_rf2rpart are empty. It is worth noting that all intermediate nodes default to the first factor level, provided it is a classification tree
+
+The tree can be populated by any dataset by setting add_data = T and supplying data, or later using
+fill_tree_data()
+```{r}
+
+iris_adapted = adapt_rf2rpart(iris_tree,add_data=T,X = iris[,-5],y = iris[,5])
+rpart.plot(iris_adapted,extra = 1,type = 2)
+```
+This fills out the intermediate nodes, providing additional insight into how a dataset is
+being classified by the tree.
+
+In addition to the plotting adapter, the package provides a function for evaluating
+tree performance. This can be used to either evaluate a decision tree, or identify
+which trees within a random forest may be best to plot, for example
+```{r pressure, echo=FALSE}
+tree_performance(tree = iris_tree,test_df = iris,test_col = "Species")
+```
+Overall, this is a simple software package designed to expand the usability of rpart's plotting software.
+
+Currently this has only been rigorously tested on classification trees. Behavior on regression trees may not
+work as expected. I may expand this functionality in the future.
+
+

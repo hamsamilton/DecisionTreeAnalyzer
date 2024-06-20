@@ -48,20 +48,20 @@ iris_test <- function(testdir,test_type = "empty"){
   make_empty_adapted <- function(iris_tree){
     
     iris_adapted = iris_tree %>% 
-      adapt_rf2rpart(add_data = F)
+      adapt_input_tree2rpart(add_data = F)
   }
   
   make_filled_adapted <- function(iris_tree){
     
     iris_adapted = iris_tree %>% 
-      adapt_rf2rpart(add_data = T,X = iris[,-5],y = iris[,5])
+      adapt_input_tree2rpart(add_data = T,X = iris[,-5],y = iris[,5])
   }
   
   make_filled_adapted_remove_setosa <- function(iris_tree){
     iris_wrong = iris 
     iris_wrong$Species[iris_wrong$Species == "setosa"] = "virginica"
     iris_adapted = iris_tree %>% 
-      adapt_rf2rpart(add_data = T,X = iris_wrong[,-5],y = iris_wrong[,5])
+      adapt_input_tree2rpart(add_data = T,X = iris_wrong[,-5],y = iris_wrong[,5])
   }
   
   save_and_plot <- function(adapted_tree, saveloc){
@@ -103,7 +103,85 @@ iris_wrong = iris
 iris_wrong$Species = "setosa"
 
 iris_adapted = iris_tree %>% 
-  adapt_rf2rpart(add_data = T,X = iris_wrong[,-5],y = iris_wrong[,5])
+  adapt_input_tree2rpart(add_data = T,X = iris_wrong[,-5],y = iris_wrong[,5])
 
-rf_tree = iris_tree
+#' test_mod_rpart
+#'
+#' Take a list of models run them through the main function, and store the results
+#'
+#' @param model_list named list of models
+#' @param save_folder where to save the plotted trees
+#' @return plots matching one tree from each model
+#' @export
+test_mod_rpart <- function(model_list,save_folder){
+  
+  dir.create(save_folder)
+
+  plts = lapply(names(model_list), function(model_name){
+    print(model_name)
+
+    model = model_list[[model_name]]
+
+    input_tree_df = getTree(model, 
+                      k        = 2, 
+                      labelVar = T)
+
+    rpart_obj = adapt_input_tree2rpart(input_tree_df)
+
+    jpeg(filename = paste0(save_folder,
+                           "/",
+                           model_name,
+                           ".jpg"),
+         width    = 12, 
+         height   = 12,
+         units    = "in",
+         res      = 720)
+
+    rpart.plot(rpart_obj,
+               type  = 4,
+               extra = 2)
+
+    dev.off()
+    return(rpart_obj)})
+
+  names(plts) = names(model_list)
+
+  return(plts)}
+
+#' make_rpart_tests
+#'
+#' Generates models to test using test_rpart, save the results in a named list
+#'
+#' @return named list of tests
+#' @export
+make_rpart_tests <- function(){
+
+  # iris test
+  data(iris)
+  iris_model = randomForest(Species ~ ., 
+                            data = iris)
+
+  #mtcars test
+  data(mtcars)
+  mtcars_model = randomForest(mpg ~ .,
+                              data     = mtcars,
+                              maxnodes = 3)
+
+  #pima indian test
+  library("MASS")
+  data(pima)
+  pima$test[pima$test ==1] <- "diabetes"
+  pima$test[pima$test ==0] <- "no diabetes"
+  pima$test = as.factor(pima$test)
+
+  pima_model <- randomForest(test ~ .,
+                             data     = pima,
+                             maxnodes = 4)
+  #make model list
+  models = list(irs     = iris_model,
+                mtcrs   = mtcars_model,
+                pma_ind = pima_model)
+
+  return(models)
+}
 

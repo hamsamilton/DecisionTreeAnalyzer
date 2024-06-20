@@ -1,5 +1,6 @@
 # to install setwd("/Users/samhamilton/Library/Mobile Documents/com~apple~CloudDocs/Thesis_Aim1/libraries/TreeAnalyzer")
 # devtools::document() ; devtools::build() ; devtools::install()
+
 #' @import randomForest
 #' @import dplyr
 #' @import rpart
@@ -11,92 +12,94 @@
 #' @export
 dplyr::`%>%`
 
-#' adapt_rf2rpart
+#' adapt_input_tree2rpart
 #'
-#' adapter function designed to take information from the rf_tree object to the
+#' adapter function designed to take information from the input_tree object to the
 #' rpart style object so that the plotting capabilities of the rpart object can be
 #' leveraged.
 #'
-#'@param rf_tree  the random forest tree object
+#'@param input_tree_df  the random forest tree object
 #'@param add_data should information from a compatible df
 #'                 be used to populate tree info? T/F
 #'@param X        if add_data = T, what is the predictor matrix
 #'@param y        if add_data = T  what are the true values?
 #'@export
-adapt_rf2rpart <- function(rf_tree,add_data,X,y){
+adapt_input_tree2rpart <- function(input_tree_df,add_data,X,y){
 
   # Init the rpart object
   rpart_obj = init_rpart()     %>%    # Initialize the object
-    mod_rpart_frame(rf_tree)   %>%    # Modify the frame aspect of the rpart object
-    mod_rpart_ylevels(rf_tree) %>%    # Change the ylevels
-    mod_rpart_splits(rf_tree)         # modify the splits part of the object
+    mod_rpart_frame(input_tree_df)   %>%    # Modify the frame aspect of the rpart object
+    mod_rpart_ylevels(input_tree_df) %>%    # Change the ylevels
+    mod_rpart_splits(input_tree_df)         # modify the splits part of the object
 
   if(add_data == T){
-    rpart_obj = rpart_obj %>% fill_tree_data(rf_tree,X,y)}
+    rpart_obj = rpart_obj %>% 
+        fill_tree_data(input_tree_df,
+                       X,
+                       y)}
 
   return(rpart_obj)
-
 }
 
 #### rf_object to rpart object adapter work begins here
 #'init_rpart
 #'
-#'This function fit a simple lm to the iris dataset so as to generate an rpart objec
-#'which can then be used as a shell for the rest of the code
+#'This function fit a simple rpart object to the iris dataset to generate an rpart object
+#'which can be modified
 #'@return an rpart object fit on the iris dataset
 #'@export
 init_rpart <- function(){
 
   data(iris)
-  model <- rpart(Species ~ ., data=iris)
+  model <- rpart(Species ~ ., 
+                 data=iris)
   return(model)
 }
 
 #' mod_rpart_frame
 #'
-#' this function transfers information from the rf_tree to the frame aspect of the
-#' rpart object
+#' Transfer information from the input format to the frame aspect of the rpart object
 #' @param rpart_obj the rpart shell to modify
-#' @param rf_tree the random forest tree
+#' @param input_tree_df the random forest tree
 #' @return modified rpart object
 #' @export
-mod_rpart_frame <- function(rpart_obj,rf_tree){
+mod_rpart_frame <- function(rpart_obj,input_tree_df){
 
   #generate frame shell
   column_names <- c("var", "n", "wt","dev","yval","complexity","ncompete","nsurrogate")
 
   # Create an empty dataframe
-  rpart_frame <- data.frame(matrix(0,ncol = length(column_names),
-                                   nrow = nrow(rf_tree)))
+  rpart_frame <- data.frame(matrix(0,
+                                   ncol = length(column_names),
+                                   nrow = nrow(input_tree_df)))
 
   # Set the column names
-  colnames(rpart_frame) <- column_names
+  colnames(rpart_frame) = column_names
 
-  # set names of the var equal to the names from rf_tree
-  rpart_frame[,"var"] = rf_tree[,"split var"]
-
+  # set names of the var equal to the names from input_tree_df
+  rpart_frame[,"var"] = input_tree_df[,"split var"]
   rpart_frame[,"var"] = as.character(rpart_frame[,"var"])
 
-  # set leafs to expected leaf name
-  rpart_frame[is.na(rf_tree[,"split var"]),"var"] = "<leaf>"
+  # set leaves to expected leaf name
+  rpart_frame[is.na(input_tree_df[,"split var"]),"var"] = "<leaf>"
 
 
-  first_non_na <- rf_tree[,"prediction"]  %>% purrr::detect(~ !is.na(.))
-  rf_tree[,"prediction"][is.na(rf_tree[,"prediction"])] <- first_non_na
+  first_non_na = input_tree_df[,"prediction"]  %>% 
+    purrr::detect(~ !is.na(.))
+  
+  input_tree_df[,"prediction"][is.na(input_tree_df[,"prediction"])] <- first_non_na
+  
   # assign the yval labels to associated dataframe levels
-
-  rpart_frame[,"yval"] = get_num_from_factor_levels(rf_tree[["prediction"]])
+  rpart_frame[,"yval"] = get_num_from_factor_levels(input_tree_df[["prediction"]])
 
   # initalize the attached matrix
-  rpart_frame_mat = init_rpart_frame_matrix(rf_tree)
-
+  rpart_frame_mat = init_rpart_frame_matrix(input_tree_df)
 
   #attach matrix to frame
-
   rpart_frame[["yval2"]] = rpart_frame_mat
 
   # modify the rownames to match the binary tree row names expected by rpart
-  rownames(rpart_frame) = make_rownames_binary_tree(rf_tree)
+  rownames(rpart_frame) = make_rownames_binary_tree(input_tree_df)
 
   rpart_obj$frame = rpart_frame
   return(rpart_obj)
@@ -105,18 +108,19 @@ mod_rpart_frame <- function(rpart_obj,rf_tree){
 #'init_rpart_frame_matrix
 #'
 #'initializes the matrix portion of the rpart$frame
-#'@param the rftree object to get the information from
+#'@param input_tree_df the input df defining the decision tree to get the information from
 #'@export
-init_rpart_frame_matrix = function(rf_tree){
+init_rpart_frame_matrix = function(input_tree_df){
 
-  predict_levels = get_num_from_factor_levels(rf_tree[["prediction"]])
+  predict_levels = get_num_from_factor_levels(input_tree_df[["prediction"]])
   nlevels = length(unique(predict_levels))
   needed_cols = nlevels*2 + 2
+  
   # initalize the attached matrix
-
-  rpart_frame_mat = matrix(0,ncol = needed_cols,
-                           byrow=F,
-                           nrow = nrow(rf_tree))
+  rpart_frame_mat = matrix(0,
+                           ncol  = needed_cols,
+                           byrow = F,
+                           nrow  = nrow(input_tree_df))
   colnames(rpart_frame_mat)[needed_cols] = "nodeprob"
   rpart_frame_mat[,1] = predict_levels
   rpart_frame_mat[,2:(needed_cols/2)] = 0
@@ -127,10 +131,10 @@ init_rpart_frame_matrix = function(rf_tree){
 
 #'get_num_from_factor_levels
 #'
-#'Transforms preidctions in whatever form into the numeric version factor levels
+#'Transforms predictions in whatever form into the numeric version factor levels
 #'within the rpart_frame object
-#'@param rf_tree the rf_tree object
-#'@return a numeric vector corresponding to the prediction column from rf_tree
+#'@param predictions vector of predictions
+#'@return a numeric vector corresponding to the prediction column from input_tree_df
 #'@export
 get_num_from_factor_levels <- function(predicts){
   num_vec = predicts %>%
@@ -142,28 +146,31 @@ get_num_from_factor_levels <- function(predicts){
 
 #'make_rownames_binary_tree
 #'
-#'the rownames of rpart$frame need to be in the binary tree format. THis function
-#'calculates those rownames based on the relationships list in the rf_tree object
-#'@param rf_tree the rf_tree object
+#'The rownames of rpart$frame need to be in the binary tree format. This function
+#'calculates those rownames based on the relationships defined in the input_df object
+#'@param input_tree_df the input_tree_df object
 #'@return a vector of numbers of the new rownames
 #'@export
-make_rownames_binary_tree = function(rf_tree){
+make_rownames_binary_tree = function(input_tree){
 
   #function for traversing the tree
-  traverse_tree <- function(rf_tree,tree_node,new_id = 1){
+  traverse_tree <- function(input_tree_df,tree_node,new_id = 1){
 
     # get the old id
     old_id = rownames(tree_node) %>%
       as.numeric()
 
-    updated_df = data.frame(old = old_id,new = new_id)
+    updated_df = data.frame(old = old_id,
+                            new = new_id)
+    
     if(tree_node[["left daughter"]] != 0){
       # call traverse_tree on child nodes
-      left_daught = traverse_tree(rf_tree,
-                                  rf_tree[tree_node[["left daughter"]],],
+      
+      left_daught = traverse_tree(input_tree_df,
+                                  input_tree_df[tree_node[["left daughter"]],],
                                   new_id = new_id*2)
-      right_daught =traverse_tree(rf_tree,
-                                  rf_tree[tree_node[["right daughter"]],],
+      right_daught =traverse_tree(input_tree_df,
+                                  input_tree_df[tree_node[["right daughter"]],],
                                   new_id = ((new_id*2) + 1))
       updated_df = updated_df %>%
         rbind(left_daught) %>%
@@ -174,9 +181,10 @@ make_rownames_binary_tree = function(rf_tree){
   }
 
   #add new id column
-  rf_tree[["new_id"]] = 0
+  input_tree_df[["new_id"]] = 0
 
-  id_df = traverse_tree(rf_tree,rf_tree[1,])
+  id_df = traverse_tree(input_tree_df,
+                        input_tree_df[1,])
   id_df = id_df[order(id_df[["old"]]),]
   new_ids = id_df$new
 
@@ -184,17 +192,17 @@ make_rownames_binary_tree = function(rf_tree){
 
 #'mod_rpart_ylevels
 #'
-#'Supplies new levels to the rpart object based on the predictions from the rf_tree
+#'Supplies new levels to the rpart object based on the predictions from the input_tree_df
 #'notably adds a blank string "" to the list to supply to nonterminal nodes as a
 #'placeholder
 #'@param rpart_obj the rpart object to be modified
-#'@param rf_tree the rf_tree object to get the names from
+#'@param input_tree_df the input tree df to get the names from
 #'@return modified rpart_object
 #'@export
-mod_rpart_ylevels = function(rpart_obj,rf_tree){
+mod_rpart_ylevels = function(rpart_obj,input_tree_df){
 
   # get unique levels
-  outcome_lvls = rf_tree[["prediction"]] %>%
+  outcome_lvls = input_tree_df[["prediction"]] %>%
     unique() %>%
     as.character() %>%
     na.omit() %>%
@@ -207,26 +215,31 @@ mod_rpart_ylevels = function(rpart_obj,rf_tree){
 #'mod_rpart_splits
 #'
 #'modifies the split aspect of the rpart_object dataframe to contain information
-#'from the rf_tree object
+#'from the input_tree_df object
 #'@param rpart_obj the rpart object to be modified
-#'@param rf_tree the rf_tree object to get the split information from
+#'@param input_tree_df the input tree df to get the split information from
 #'@return modified rpart_object
 #'@export
-mod_rpart_splits = function(rpart_obj,rf_tree){
+mod_rpart_splits = function(rpart_obj,input_tree_df){
 
   # get split information
-  rf_tree_splits = rf_tree %>%
+  input_tree_df_splits = input_tree_df %>%
     filter(!is.na(`split var`)) %>%
-    dplyr::select(all_of(c("split var","split point")))
+    dplyr::select(all_of(c("split var",
+                           "split point")))
 
   # initialize split information
   splits = matrix(c(0,-1,40,0,0),
-                  nrow = nrow(rf_tree_splits),
-                  ncol = 5,
-                  byrow = T,
-                  dimnames= list(rf_tree_splits[["split var"]],
-                                 c("count","ncat","improve","index","adj")))
-  splits[,"index"] = rf_tree_splits[["split point"]]
+                  nrow     = nrow(input_tree_df_splits),
+                  ncol     = 5,
+                  byrow    = T,
+                  dimnames = list(input_tree_df_splits[["split var"]],
+                                  c("count",
+                                    "ncat",
+                                    "improve",
+                                    "index",
+                                    "adj")))
+  splits[,"index"] = input_tree_df_splits[["split point"]]
 
   rpart_obj[["splits"]] = splits
 
@@ -241,6 +254,7 @@ mod_rpart_splits = function(rpart_obj,rf_tree){
 #' @return plots matching one tree from each model
 #' @export
 test_mod_rpart <- function(model_list,save_folder){
+  
   dir.create(save_folder)
 
   plts = lapply(names(model_list), function(model_name){
@@ -248,17 +262,26 @@ test_mod_rpart <- function(model_list,save_folder){
 
     model = model_list[[model_name]]
 
-    rf_tree = getTree(model, k = 2, labelVar = T)
+    input_tree_df = getTree(model, 
+                      k        = 2, 
+                      labelVar = T)
 
-    rpart_obj = adapt_rf2rpart(rf_tree)
+    rpart_obj = adapt_input_tree2rpart(input_tree_df)
 
-    jpeg(filename = paste0(save_folder,"/",model_name,".jpg"),
-         width = 12, height = 12, units = "in",res = 720)
+    jpeg(filename = paste0(save_folder,
+                           "/",
+                           model_name,
+                           ".jpg"),
+         width    = 12, 
+         height   = 12,
+         units    = "in",
+         res      = 720)
 
-    rpart.plot(rpart_obj,type = 4,extra = 2)
+    rpart.plot(rpart_obj,
+               type  = 4,
+               extra = 2)
 
     dev.off()
-
     return(rpart_obj)})
 
   names(plts) = names(model_list)
@@ -274,13 +297,15 @@ test_mod_rpart <- function(model_list,save_folder){
 make_rpart_tests <- function(){
 
   # iris test
-
   data(iris)
-  iris_model = randomForest(Species ~ ., data = iris)
+  iris_model = randomForest(Species ~ ., 
+                            data = iris)
 
   #mtcars test
   data(mtcars)
-  mtcars_model = randomForest(mpg ~.,data = mtcars,maxnodes = 3)
+  mtcars_model = randomForest(mpg ~ .,
+                              data     = mtcars,
+                              maxnodes = 3)
 
   #pima indian test
   library("MASS")
@@ -289,30 +314,32 @@ make_rpart_tests <- function(){
   pima$test[pima$test ==0] <- "no diabetes"
   pima$test = as.factor(pima$test)
 
-  pima_model <- randomForest(test ~ ., data = pima,maxnodes = 4)
+  pima_model <- randomForest(test ~ .,
+                             data     = pima,
+                             maxnodes = 4)
   #make model list
-  models = list(irs = iris_model,mtcrs = mtcars_model,pma_ind = pima_model)
-
+  models = list(irs     = iris_model,
+                mtcrs   = mtcars_model,
+                pma_ind = pima_model)
 
   return(models)
-
 }
 
 #' fill_tree_data
 #'
 #' fills the tree with information from which it was trained
 #' @param rpart_obj the rpart object to modify
-#' @param rf_tree   the rf_tree object representing the tree to fill
+#' @param input_tree_df   the input tree df representing the tree to fill
 #' @param X the data used to train the model or data of an equivilant format
 #' no true labels
 #' @param y the true labels for the training data
 #' @return an rpart object with the split information correctly filled out based on
 #' the supplied information
 #' @export
-fill_tree_data <- function(rpart_obj,rf_tree, X, y){
+fill_tree_data <- function(rpart_obj,input_tree_df, X, y){
   
   # Enforces rules for using fill_tree_data and returns meaningful messages when they aren't met
-  police_fill_tree_data = function(rpart_obj,rf_tree,X,y){
+  police_fill_tree_data = function(rpart_obj,input_tree_df,X,y){
     
     need_more_than_one_class <- function(y){
       if(length(unique(y)) > 1){
@@ -322,14 +349,13 @@ fill_tree_data <- function(rpart_obj,rf_tree, X, y){
         print("fill_tree_data() requires that y have more than one class")
       }
     }
-    
     need_more_than_one_class(y)
   }
 
-  # create a matrix for rf_tree that correspond to what needs to be filled in for the
-  #matrix part of the rp
+  # create a matrix for input tree df that correspond to what needs to be filled in for the
+  # matrix part of the rp
   # rpart matrix
-  rpart_mat = init_rpart_frame_matrix(rf_tree)
+  rpart_mat = init_rpart_frame_matrix(input_tree_df)
 
   # transform the predicted vector into numbers correspond to their factor levels
   y = get_num_from_factor_levels(y)
@@ -350,15 +376,15 @@ fill_tree_data <- function(rpart_obj,rf_tree, X, y){
     while(iframe != 0){
 
       # identify splitting variable and splitting value, and next nodes
-      split_var      = rf_tree[iframe,"split var"] %>% as.character()
-      split_point    = rf_tree[iframe,"split point"]
-      right_daughter = rf_tree[iframe,"right daughter"]
-      left_daughter  = rf_tree[iframe,"left daughter"]
+      split_var      = input_tree_df[iframe,"split var"] %>% as.character()
+      split_point    = input_tree_df[iframe,"split point"]
+      right_daughter = input_tree_df[iframe,"right daughter"]
+      left_daughter  = input_tree_df[iframe,"left daughter"]
 
       # add to n
       rpart_mat[iframe,iclass + 1] = rpart_mat[iframe,iclass + 1] + 1
 
-      if(!is.na(rf_tree[iframe,"split var"])){
+      if(!is.na(input_tree_df[iframe,"split var"])){
 
         # identify next node
         iframe = if_else(irow[[split_var]] >= split_point,

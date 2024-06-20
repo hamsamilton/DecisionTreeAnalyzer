@@ -1,12 +1,11 @@
 Package: TreeAnalyzer
 Type: Package
-Title: What the Package Does (Title Case)
-Version: 0.1.0
-Author: Samuel Hadmilton
-Maintainer: The package maintainer <samuelhamilton2024@u.northwestern.edu>
-Description: More about what it does (maybe more than one line)
-    Use four spaces when indenting paragraphs within the Description.
-License: What license is it under?
+Title: Provides a decision tree interface as well as tools to evaluate and plot them
+Version: 1.0.0
+Author: Samuel Hamilton
+Maintainer: Samuel Hamilton  <samuelhamilton2024@u.northwestern.edu>
+Description: Decision Trees are a valuable machine learning approach because of their interpretability and ability to model non-linear dynamics. This. Currently, the tools to analyze them in R are limited. This package provides a straightforward and easy to implement interface for decision trees that can be defined in  R or as a .csv and tools to evaluate and visualize those trees
+License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
 RoxygenNote: 7.2.3
@@ -14,3 +13,4 @@ Imports:
   dplyr,
   randomForest,
   MASS
+VignetteBuilder: knitr, rmarkdown

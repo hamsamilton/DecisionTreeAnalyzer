@@ -4,17 +4,16 @@
 \alias{mod_rpart_frame}
 \title{mod_rpart_frame}
 \usage{
-mod_rpart_frame(rpart_obj, rf_tree)
+mod_rpart_frame(rpart_obj, input_tree_df)
 }
 \arguments{
 \item{rpart_obj}{the rpart shell to modify}
 
-\item{rf_tree}{the random forest tree}
+\item{input_tree_df}{the random forest tree}
 }
 \value{
 modified rpart object
 }
 \description{
-this function transfers information from the rf_tree to the frame aspect of the
-rpart object
+Transfer information from the input format to the frame aspect of the rpart object
 }

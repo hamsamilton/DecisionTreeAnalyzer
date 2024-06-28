@@ -4,11 +4,12 @@
 \alias{init_rpart_frame_matrix}
 \title{init_rpart_frame_matrix}
 \usage{
-init_rpart_frame_matrix(rf_tree)
+init_rpart_frame_matrix(input_tree_df)
 }
 \arguments{
-\item{the}{rftree object to get the information from}
+\item{input_tree_df}{the input df defining the decision tree to get the information from}
 }
 \description{
-initializes the matrix portion of the rpart$frame
+initializes the matrix portion of the rpart$frame with the format for the
+correct number of classes
 }

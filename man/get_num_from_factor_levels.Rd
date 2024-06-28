@@ -7,12 +7,12 @@
 get_num_from_factor_levels(predicts)
 }
 \arguments{
-\item{rf_tree}{the rf_tree object}
+\item{predictions}{vector of predictions}
 }
 \value{
-a numeric vector corresponding to the prediction column from rf_tree
+a numeric vector corresponding to the prediction column from input_tree_df
 }
 \description{
-Transforms preidctions in whatever form into the numeric version factor levels
+Transforms predictions in whatever form into the numeric version factor levels
 within the rpart_frame object
 }

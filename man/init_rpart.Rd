@@ -4,12 +4,15 @@
 \alias{init_rpart}
 \title{init_rpart}
 \usage{
-init_rpart()
+init_rpart(model_type)
+}
+\arguments{
+\item{model_type}{Whether to return a model for 'regression' or a 'categorical' prediction}
 }
 \value{
 an rpart object fit on the iris dataset
 }
 \description{
-This function fit a simple lm to the iris dataset so as to generate an rpart objec
-which can then be used as a shell for the rest of the code
+This function fit a simple rpart object to the iris dataset to generate an rpart object
+which can be modified
 }

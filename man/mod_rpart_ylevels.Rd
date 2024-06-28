@@ -4,18 +4,18 @@
 \alias{mod_rpart_ylevels}
 \title{mod_rpart_ylevels}
 \usage{
-mod_rpart_ylevels(rpart_obj, rf_tree)
+mod_rpart_ylevels(rpart_obj, input_tree_df)
 }
 \arguments{
 \item{rpart_obj}{the rpart object to be modified}
 
-\item{rf_tree}{the rf_tree object to get the names from}
+\item{input_tree_df}{the input tree df to get the names from}
 }
 \value{
 modified rpart_object
 }
 \description{
-Supplies new levels to the rpart object based on the predictions from the rf_tree
+Supplies new levels to the rpart object based on the predictions from the input_tree_df
 notably adds a blank string "" to the list to supply to nonterminal nodes as a
 placeholder
 }

@@ -4,17 +4,19 @@
 \alias{fill_tree_data}
 \title{fill_tree_data}
 \usage{
-fill_tree_data(rpart_obj, rf_tree, X, y)
+fill_tree_data(rpart_obj, input_tree_df, X, y, model_type)
 }
 \arguments{
 \item{rpart_obj}{the rpart object to modify}
 
-\item{rf_tree}{the rf_tree object representing the tree to fill}
+\item{input_tree_df}{the input tree df representing the tree to fill}
 
 \item{X}{the data used to train the model or data of an equivilant format
 no true labels}
 
 \item{y}{the true labels for the training data}
+
+\item{model_type}{what kind of model 'regression' or 'categorical'}
 }
 \value{
 an rpart object with the split information correctly filled out based on

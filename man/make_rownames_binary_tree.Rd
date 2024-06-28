@@ -4,15 +4,15 @@
 \alias{make_rownames_binary_tree}
 \title{make_rownames_binary_tree}
 \usage{
-make_rownames_binary_tree(rf_tree)
+make_rownames_binary_tree(input_tree_df)
 }
 \arguments{
-\item{rf_tree}{the rf_tree object}
+\item{input_tree_df}{the input_tree_df object}
 }
 \value{
 a vector of numbers of the new rownames
 }
 \description{
-the rownames of rpart$frame need to be in the binary tree format. THis function
-calculates those rownames based on the relationships list in the rf_tree object
+The rownames of rpart$frame need to be in the binary tree format. This function
+calculates those rownames based on the relationships defined in the input_df object
 }

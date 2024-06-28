@@ -9,8 +9,33 @@
 #' @import rpart.plot
 #' @import pheatmap
 #' @import RColorBrewer
+
 #' @export
 dplyr::`%>%`
+
+#' adapt_manual_tree
+#' 
+#' Adapt trees defined from the user interface to the format interfaced with
+#' the rest of the package
+#' 
+#' @param InputTreeDF The input tree from the user interface, the interface is defined
+#' as such. columns should be c('left daughter','right daughter','split var','split point','prediction'.
+#' For non terminal nodes, the left and right daughter columns should give the numbers of each node
+#' for terminal nodes, both left and right daughter values should be 0. For nonterminal nods
+#' Split var should include the name of the variable used for splitting at that node. Leave blank for terminal nodes.
+#' the split point should give the point at which to split the node. If it is less than the value
+#'it will flow to left daughtr, if it is greater it will go to right daughter. prediction needs only
+#'  to be filled out for terminal nodes and should indicate the desired prediction.
+#' @return The input tree df compatible with the rest of the package
+#' @export
+adapt_manual_tree <- function(InputTreeDF){
+  
+  InputTreeDF['split point'][is.na(InputTreeDF['split point'])] = 0
+  
+  #I don't think this package uses status for anything so 1 is just a placeholder val
+  InputTreeDF['status'] = 1 
+  
+  return(InputTreeDF)}
 
 #' adapt_input_tree2rpart
 #'
@@ -19,24 +44,45 @@ dplyr::`%>%`
 #' leveraged.
 #'
 #'@param input_tree_df  the random forest tree object
-#'@param add_data should information from a compatible df
-#'                 be used to populate tree info? T/F
 #'@param X        if add_data = T, what is the predictor matrix
 #'@param y        if add_data = T  what are the true values?
+#'@param model_type what kind of prediction you are making 'categorical' or 'regression'
 #'@export
-adapt_input_tree2rpart <- function(input_tree_df,add_data,X,y){
+adapt_input_tree2rpart <- function(input_tree_df,X,y,model_type){
 
   # Init the rpart object
-  rpart_obj = init_rpart()     %>%    # Initialize the object
+  rpart_obj = init_rpart(model_type) %>%    # Initialize the objects
     mod_rpart_frame(input_tree_df)   %>%    # Modify the frame aspect of the rpart object
-    mod_rpart_ylevels(input_tree_df) %>%    # Change the ylevels
-    mod_rpart_splits(input_tree_df)         # modify the splits part of the object
+    mod_rpart_ylevels(input_tree_df) %>%     # Change the ylevels
+    mod_rpart_splits(input_tree_df,X) %>%   # modify the splits part of the object
+    fill_tree_data(input_tree_df,
+                   X,
+                   y,
+                   model_type = model_type)
 
-  if(add_data == T){
-    rpart_obj = rpart_obj %>% 
-        fill_tree_data(input_tree_df,
-                       X,
-                       y)}
+  # Modify the model to the regression outcome part
+  if(model_type == 'regression'){
+    rpart_obj$frame$yval2 = NULL}
+  
+  # Add information on the factor levels for categorical predictors to the object attributes
+  
+  # Initialize an empty list to store levels of factor variables
+  xlevels <- list()
+  
+  # Loop through the variables used in the model
+  model_vars <- colnames(X)
+  for (var in model_vars) {
+    print(var)
+    # Check if the variable is a factor
+    if (is.factor(X[[var]])) {
+      # Store the levels of the factor variable
+      xlevels[[var]] <- levels(X[[var]])
+    }
+  }
+  
+  # Set the xlevels attribute to the model
+  attr(rpart_obj, "xlevels") <- xlevels
+  
 
   return(rpart_obj)
 }
@@ -46,13 +92,23 @@ adapt_input_tree2rpart <- function(input_tree_df,add_data,X,y){
 #'
 #'This function fit a simple rpart object to the iris dataset to generate an rpart object
 #'which can be modified
+#'@param model_type Whether to return a model for 'regression' or a 'categorical' prediction
 #'@return an rpart object fit on the iris dataset
 #'@export
-init_rpart <- function(){
-
+init_rpart <- function(model_type){
+  
   data(iris)
+  
+  if(model_type == 'categorical'){
   model <- rpart(Species ~ ., 
-                 data=iris)
+                 data=iris)}
+  
+  if(model_type == 'regression'){
+    iris$Species = NULL
+    
+    model <- rpart(Sepal.Length ~ ., 
+                   data=iris)}
+    
   return(model)
 }
 
@@ -81,7 +137,8 @@ mod_rpart_frame <- function(rpart_obj,input_tree_df){
   rpart_frame[,"var"] = as.character(rpart_frame[,"var"])
 
   # set leaves to expected leaf name
-  rpart_frame[is.na(input_tree_df[,"split var"]),"var"] = "<leaf>"
+  rpart_frame[is.na(input_tree_df[,"split var"]),
+              "var"] = "<leaf>"
 
 
   first_non_na = input_tree_df[,"prediction"]  %>% 
@@ -92,7 +149,7 @@ mod_rpart_frame <- function(rpart_obj,input_tree_df){
   # assign the yval labels to associated dataframe levels
   rpart_frame[,"yval"] = get_num_from_factor_levels(input_tree_df[["prediction"]])
 
-  # initalize the attached matrix
+  # initalize the attached matrix, yval2 that contains inforamtion for categorical models
   rpart_frame_mat = init_rpart_frame_matrix(input_tree_df)
 
   #attach matrix to frame
@@ -101,17 +158,22 @@ mod_rpart_frame <- function(rpart_obj,input_tree_df){
   # modify the rownames to match the binary tree row names expected by rpart
   rownames(rpart_frame) = make_rownames_binary_tree(input_tree_df)
 
+  # add in the new object
   rpart_obj$frame = rpart_frame
+  
   return(rpart_obj)
 }
 
 #'init_rpart_frame_matrix
 #'
-#'initializes the matrix portion of the rpart$frame
+#'initializes the matrix portion of the rpart$frame with the format for the
+#' correct number of classes
+#'
 #'@param input_tree_df the input df defining the decision tree to get the information from
 #'@export
 init_rpart_frame_matrix = function(input_tree_df){
 
+  # calc how many classes and how many columns are needed to store the information
   predict_levels = get_num_from_factor_levels(input_tree_df[["prediction"]])
   nlevels = length(unique(predict_levels))
   needed_cols = nlevels*2 + 2
@@ -121,8 +183,12 @@ init_rpart_frame_matrix = function(input_tree_df){
                            ncol  = needed_cols,
                            byrow = F,
                            nrow  = nrow(input_tree_df))
+  
   colnames(rpart_frame_mat)[needed_cols] = "nodeprob"
+  
+  # Initialize the labels for each node
   rpart_frame_mat[,1] = predict_levels
+  
   rpart_frame_mat[,2:(needed_cols/2)] = 0
   rpart_frame_mat[,(needed_cols/2 + 1):(needed_cols - 1)] = (1 / nlevels)
 
@@ -151,9 +217,9 @@ get_num_from_factor_levels <- function(predicts){
 #'@param input_tree_df the input_tree_df object
 #'@return a vector of numbers of the new rownames
 #'@export
-make_rownames_binary_tree = function(input_tree){
+make_rownames_binary_tree = function(input_tree_df){
 
-  #function for traversing the tree
+  # Recursive function for traversing the tree
   traverse_tree <- function(input_tree_df,tree_node,new_id = 1){
 
     # get the old id
@@ -169,9 +235,10 @@ make_rownames_binary_tree = function(input_tree){
       left_daught = traverse_tree(input_tree_df,
                                   input_tree_df[tree_node[["left daughter"]],],
                                   new_id = new_id*2)
-      right_daught =traverse_tree(input_tree_df,
-                                  input_tree_df[tree_node[["right daughter"]],],
-                                  new_id = ((new_id*2) + 1))
+      
+      right_daught = traverse_tree(input_tree_df,
+                                   input_tree_df[tree_node[["right daughter"]],],
+                                        new_id = ((new_id*2) + 1))
       updated_df = updated_df %>%
         rbind(left_daught) %>%
         rbind(right_daught)
@@ -216,12 +283,74 @@ mod_rpart_ylevels = function(rpart_obj,input_tree_df){
 #'
 #'modifies the split aspect of the rpart_object dataframe to contain information
 #'from the input_tree_df object
-#'@param rpart_obj the rpart object to be modified
+#'
 #'@param input_tree_df the input tree df to get the split information from
+#'@param X the dataframe of predictors, needed to determine which variables are factors and numerics 
 #'@return modified rpart_object
 #'@export
-mod_rpart_splits = function(rpart_obj,input_tree_df){
+mod_rpart_splits = function(rpart_obj,input_tree_df,X){
+  
+  # Used to create the csplit object that contains information on splitting categorical variables
+  make_csplit <- function(rpart_obj,input_tree_df){
+    
+    # ID splits from the input_tree_df 
+    cat_splits = input_tree_df %>% 
+      filter(status == -3)
+    
+    # fetch split object to get into, subset only to cat variables
+    splits = rpart_obj$splits 
+    splits = splits[splits[,2] > 1,]
+    
+    
+    # ID dimensions
+    nrow = sum(splits[,2] > 1) # how many cat splits are there
+    ncol = max(splits[,2]) # what is the maximum number of factors
+    
+    # initialize matrix
+    csplit = matrix(nrow = nrow,
+                    ncol = ncol)
+    
+    for(isplit in 1:nrow(cat_splits)){
+      split_var = cat_splits[isplit,'split var'][[1]] %>% as.character()
+      split_point = cat_splits[isplit,'split point'][[1]]
+      ncat = splits[match(split_var,rownames(splits)),
+                    'ncat']
+      
+      csplit[isplit,] = 2 # 2s are unused or irrelevant factor levels
+      csplit[isplit,1:ncat] = 3 # for factor levels that fail the test
+      csplit[isplit,split_point] = 1 # the correct factor level
+    }
+    
+    print(csplit)
+  
+    return(csplit) }
 
+    
+  
+  # categorical predictors require the # of factor levels in this field while the
+  # continuous values don't
+  Make_ncat_info <- function(input_df) {
+    # Initialize vectors to store the column names and their corresponding values
+    col_names <- colnames(input_df)
+    col_values <- sapply(input_df, function(col) {
+      if (is.numeric(col)) {
+        return(-1)
+      } else if (is.factor(col)) {
+        return(length(levels(col)))
+      } else {
+        return(NA)
+      }
+    })
+    
+    # Create a new dataframe with the results
+    summary_df <- data.frame(
+      ColumnName = col_names,
+      Value = col_values
+    )
+    
+    return(summary_df)
+  }
+  ncat_info = Make_ncat_info(X)
   # get split information
   input_tree_df_splits = input_tree_df %>%
     filter(!is.na(`split var`)) %>%
@@ -239,9 +368,23 @@ mod_rpart_splits = function(rpart_obj,input_tree_df){
                                     "improve",
                                     "index",
                                     "adj")))
+  
+  # Add the split points
   splits[,"index"] = input_tree_df_splits[["split point"]]
-
+  
+  splits[,'ncat'] = ncat_info[['Value']][match(rownames(splits), 
+                                               ncat_info[['ColumnName']])]
+  
+  # For categorical variables replace the index with the index that will refer to the
+  # row in the csplit matrix which will contain the splitting information
+  splits[(splits[,'ncat'] > 1),
+         'index'] = seq(1,sum(splits[,'ncat'] > 1))
+  
   rpart_obj[["splits"]] = splits
+  
+  rpart_obj[['csplit']] = make_csplit(rpart_obj,input_tree_df)
+
+
 
   return(rpart_obj)}
 
@@ -258,7 +401,6 @@ test_mod_rpart <- function(model_list,save_folder){
   dir.create(save_folder)
 
   plts = lapply(names(model_list), function(model_name){
-    print(model_name)
 
     model = model_list[[model_name]]
 
@@ -333,33 +475,31 @@ make_rpart_tests <- function(){
 #' @param X the data used to train the model or data of an equivilant format
 #' no true labels
 #' @param y the true labels for the training data
+#' @param model_type what kind of model 'regression' or 'categorical'
 #' @return an rpart object with the split information correctly filled out based on
 #' the supplied information
 #' @export
-fill_tree_data <- function(rpart_obj,input_tree_df, X, y){
+fill_tree_data <- function(rpart_obj,input_tree_df, X, y, model_type){
   
-  # Enforces rules for using fill_tree_data and returns meaningful messages when they aren't met
-  police_fill_tree_data = function(rpart_obj,input_tree_df,X,y){
-    
-    need_more_than_one_class <- function(y){
-      if(length(unique(y)) > 1){
-        return(invisible(NULL))
-      }
-      else{ 
-        print("fill_tree_data() requires that y have more than one class")
-      }
-    }
-    need_more_than_one_class(y)
-  }
-
   # create a matrix for input tree df that correspond to what needs to be filled in for the
   # matrix part of the rp
   # rpart matrix
   rpart_mat = init_rpart_frame_matrix(input_tree_df)
 
   # transform the predicted vector into numbers correspond to their factor levels
-  y = get_num_from_factor_levels(y)
-
+  response = get_num_from_factor_levels(y)
+  
+  if(model_type == 'regression'){
+    
+    response = rep(1,
+                   length(response))}
+  
+  # initialize the list of lists that will hold the values of all the samples that
+  # pass through each node
+  value_list = replicate(nrow(rpart_mat),
+                         c(),
+                         simplify = F)
+  
   for (i in 1:nrow(X)){
 
     iframe = 1
@@ -368,53 +508,80 @@ fill_tree_data <- function(rpart_obj,input_tree_df, X, y){
     irow = X[i,]
 
     # see the class
-    iclass = y[i]
-    tst = 0
-
-
+    iclass = response[i]
+    
+    # grab the value of y (only used for regression models)
+    value = y[i]
 
     while(iframe != 0){
 
       # identify splitting variable and splitting value, and next nodes
       split_var      = input_tree_df[iframe,"split var"] %>% as.character()
+      var_is_numeric = is.numeric(X[[split_var]])
       split_point    = input_tree_df[iframe,"split point"]
       right_daughter = input_tree_df[iframe,"right daughter"]
       left_daughter  = input_tree_df[iframe,"left daughter"]
 
       # add to n
       rpart_mat[iframe,iclass + 1] = rpart_mat[iframe,iclass + 1] + 1
+      
+      # add to the recorded value list
+      value_list[[iframe]] <- append(value_list[[iframe]] ,value)
 
       if(!is.na(input_tree_df[iframe,"split var"])){
 
         # identify next node
-        iframe = if_else(irow[[split_var]] >= split_point,
+        if(var_is_numeric){
+          pass = irow[[split_var]] >= split_point}
+        else{
+          pass =  as.numeric(irow[[split_var]]) == split_point}
+        
+        iframe = if_else(pass,
                          right_daughter,
-                         left_daughter)
-      }
-      else{iframe = 0}
-    }
-    next
-  }
+                         left_daughter)}
 
+      else{iframe = 0}}
+    next}
+  
   # modify the remaining columns of the matrix
-  nlevels = length(unique(y))
+  nlevels = length(unique(response))
   needed_cols = nlevels*2 + 2
 
-  rpart_mat_nums = rpart_mat[,2:(needed_cols/2)]
+  rpart_mat_nums = rpart_mat[,2:(needed_cols/2)] %>% 
+    as.matrix()
+  
   rpart_mat_nums_sums = rowSums(rpart_mat_nums)
+    
 
   rpart_mat_nums_perc = rpart_mat_nums / rpart_mat_nums_sums
   rpart_mat[,(needed_cols/2 + 1):(needed_cols - 1)] = rpart_mat_nums_perc
 
-  node_max = max(rpart_mat_nums_sums)
-  rpart_mat[,needed_cols] = rpart_mat_nums_sums / node_max
+  rpart_mat[,needed_cols] = rpart_mat_nums_sums / max(rpart_mat_nums_sums)
 
   # modify rpartobject
   rpart_obj$frame$yval2 = rpart_mat
-
+  
   # change intermediate node display values to whatever is the dominant class
   int_nodes =  which(rpart_obj$frame$var != "<leaf>")
-  rpart_obj$frame$yval2[int_nodes,1] = apply(rpart_mat_nums[int_nodes,],MARGIN = 1,FUN = which.max)
+  
+  if(model_type == 'categorical'){
+    rpart_obj$frame$yval2[int_nodes,1] = apply(rpart_mat_nums[int_nodes,],
+                                               MARGIN = 1,
+                                               FUN    = which.max)}
+    
+  # modify n and wt which are used to calculate the node probabilities in teh tree
+  # both of these just match the total number of observations in the tree
+  print(rpart_mat)
+  rpart_obj$frame$n = rowSums(as.matrix(rpart_mat[,2:(2+(nlevels-1))]))
+  rpart_obj$frame$wt = rowSums(as.matrix(rpart_mat[,2:(2+(nlevels-1))]))
+  
+  # Modify the value part of the frame so it matches the average value at each node
+  # which is what is displayed in regression models
+  if(model_type == 'regression'){
+    
+    rpart_obj$frame$yval = sapply(value_list,
+                                  mean)}
+  
 
   return(rpart_obj) }
 
@@ -661,8 +828,6 @@ mk_confusion_mat <- function(tree_pref_obj, save_loc = "~/confmatsz.jpeg") {
                      fontsize = 15,
               margin = 40)
 
-
-
 }
 #'QckRBrwrPllt
 #'
@@ -676,3 +841,5 @@ QckRBrwrPllt <- function(name,n) {
   plt <- colorRampPalette(RColorBrewer::brewer.pal(8,name))(n)
   return(plt)
 }
+
+

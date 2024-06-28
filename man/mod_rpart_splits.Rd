@@ -4,17 +4,17 @@
 \alias{mod_rpart_splits}
 \title{mod_rpart_splits}
 \usage{
-mod_rpart_splits(rpart_obj, rf_tree)
+mod_rpart_splits(rpart_obj, input_tree_df)
 }
 \arguments{
 \item{rpart_obj}{the rpart object to be modified}
 
-\item{rf_tree}{the rf_tree object to get the split information from}
+\item{input_tree_df}{the input tree df to get the split information from}
 }
 \value{
 modified rpart_object
 }
 \description{
 modifies the split aspect of the rpart_object dataframe to contain information
-from the rf_tree object
+from the input_tree_df object
 }
